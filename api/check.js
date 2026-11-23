@@ -2,6 +2,7 @@
 // GET /api/check?lat=37.53&lon=126.93   또는   GET /api/check?q=여의도한강공원
 import { checkAirspace } from '../lib/aip.js';
 import { geocode } from '../lib/geocode.js';
+import { checkExtra, mergeResults } from '../lib/extra.js';
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -17,7 +18,8 @@ export default async function handler(req, res) {
     if (!Number.isFinite(la) || !Number.isFinite(lo) || la < 32 || la > 39.5 || lo < 123 || lo > 132.5) {
       return res.status(400).json({ error: '한국 범위의 lat, lon 또는 q가 필요해요' });
     }
-    const result = await checkAirspace(lo, la);
+    const [core, extra] = await Promise.all([checkAirspace(lo, la), checkExtra(lo, la)]);
+    const result = mergeResults(core, extra);
     res.status(200).json({ lat: la, lon: lo, place, ...result });
   } catch (e) {
     console.error(e);
