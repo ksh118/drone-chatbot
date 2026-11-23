@@ -1,0 +1,12 @@
+{
+  "name": "drone-kakao-chatbot",
+  "version": "1.0.0",
+  "description": "카카오톡 채널 드론 비행가능지역 안내 챗봇 (V-World 공역 조회)",
+  "type": "module",
+  "private": true,
+  "engines": { "node": ">=18" },
+  "scripts": {
+    "test": "node test/mock-test.mjs",
+    "try": "node test/try-real.mjs"
+  }
+}
