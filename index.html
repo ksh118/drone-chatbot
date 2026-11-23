@@ -2,203 +2,22 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>드론봇 공역 지도</title>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>드론봇</title>
 <style>
-  :root { --bg:#0f1115; --panel:#171a21; --line:#2a2f3a; --text:#e8eaf0; --muted:#9aa3b2;
-          --red:#ef4444; --nuke:#b91c1c; --ctr:#d946ef; --orange:#f97316; --yellow:#eab308; --green:#22c55e; }
-  * { box-sizing:border-box; }
-  html, body { margin:0; height:100%; background:var(--bg); color:var(--text);
-    font-family:-apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
-  #app { display:flex; flex-direction:column; height:100%; }
-  header { padding:12px 14px 10px; background:var(--panel); border-bottom:1px solid var(--line); }
-  h1 { margin:0; font-size:17px; letter-spacing:-.2px; }
-  .sub { margin-top:2px; font-size:12px; color:var(--muted); }
-  form { display:flex; gap:6px; margin-top:10px; }
-  input[type=search] { flex:1; min-width:0; padding:10px 12px; border-radius:10px; border:1px solid var(--line);
-    background:#0b0d11; color:var(--text); font-size:15px; }
-  button { padding:10px 12px; border-radius:10px; border:1px solid var(--line); background:#232836; color:var(--text);
-    font-size:14px; white-space:nowrap; cursor:pointer; }
-  button.primary { background:#2563eb; border-color:#2563eb; }
-  .legend { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-  .chip { display:flex; align-items:center; gap:6px; padding:5px 9px; border-radius:999px; border:1px solid var(--line);
-    font-size:12px; color:var(--text); background:#11141a; cursor:pointer; user-select:none; }
-  .chip.off { opacity:.35; }
-  .dot { width:10px; height:10px; border-radius:3px; }
-  #map { flex:1; }
-  #result { position:absolute; left:10px; right:10px; bottom:calc(14px + env(safe-area-inset-bottom)); z-index:1000;
-    background:rgba(23,26,33,.97); border:1px solid var(--line); border-radius:14px; padding:12px 14px;
-    font-size:14px; line-height:1.5; box-shadow:0 8px 30px rgba(0,0,0,.4); display:none; max-width:520px; margin:0 auto; }
-  #result .v { font-size:16px; font-weight:700; margin-bottom:2px; }
-  #result .close { position:absolute; top:6px; right:8px; background:none; border:none; color:var(--muted); font-size:18px; padding:4px 8px; }
-  #result small { color:var(--muted); }
-  .leaflet-popup-content { font-size:13px; line-height:1.45; }
-  .note { font-size:11px; color:var(--muted); margin-top:8px; }
+  html,body{margin:0;height:100%;background:#0f1115;color:#e8eaf0;
+    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
+  main{max-width:440px;margin:0 auto;padding:56px 22px;text-align:center}
+  h1{font-size:22px;margin:0 0 8px}
+  p{color:#9aa3b2;font-size:14px;line-height:1.6;margin:0}
+  .ok{display:inline-block;margin-top:18px;padding:6px 12px;border-radius:999px;background:#14532d;color:#bbf7d0;font-size:13px}
 </style>
 </head>
 <body>
-<div id="app">
-  <header>
-    <h1>🚁 드론봇 공역 지도</h1>
-    <div class="sub" id="meta">우리 API에서 공역을 불러오는 중…</div>
-    <form id="search">
-      <input type="search" id="q" placeholder="장소 검색 (예: 여의도한강공원)" autocomplete="off">
-      <button class="primary" type="submit">확인</button>
-      <button type="button" id="me">📍 내 위치</button>
-    </form>
-    <div class="legend" id="legend"></div>
-    <div class="legend" id="legend2"></div>
-    <div class="note">지도를 누르면 그 지점을 판정해요. 참고용이에요. 비행 전 노탐(NOTAM)과 드론 원스톱을 꼭 확인하세요.</div>
-  </header>
-  <div id="map"></div>
-</div>
-<div id="result"><button class="close" aria-label="닫기">×</button><div id="resultBody"></div></div>
-
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-<script>
-const KINDS = [
-  { kind: '비행금지구역',       color: 'var(--red)',    hex: '#ef4444' },
-  { kind: '비행금지구역(원전)', color: 'var(--nuke)',   hex: '#b91c1c' },
-  { kind: '관제권',             color: 'var(--ctr)',    hex: '#d946ef' },
-  { kind: '비행제한구역',       color: 'var(--orange)', hex: '#f97316' },
-  { kind: '위험구역',           color: 'var(--yellow)', hex: '#eab308' },
-];
-const VERDICT = {
-  red:     ['🔴 비행 불가', '승인 없이 날리면 안 돼요'],
-  orange:  ['🟠 비행승인 필요', '드론 원스톱에서 승인을 신청하세요'],
-  green:   ['🟢 관제권·금지·제한구역 밖', '고도 150m 미만, 낮에만, 눈으로 보이는 범위에서'],
-  unknown: ['⚪ 확인 실패', '공역 데이터를 읽지 못했어요'],
-};
-
-const map = L.map('map', { zoomControl: true }).setView([36.4, 127.8], 7);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-  maxZoom: 18, attribution: '© OpenStreetMap contributors · 공역: 국토교통부 eAIP',
-}).addTo(map);
-
-// 원스톱과 같은 추가 레이어 (브이월드 WMS, 우리 서버 /api/wms 가 중계)
-const EXTRA = [
-  ['lt_c_aisobls', '장애물공역', '#111827'], ['lt_c_aisatzc', '비행장교통구역', '#64748b'],
-  ['lt_c_aisaltc', '경계구역', '#0ea5e9'], ['lt_c_aispca', '사전협의구역', '#a855f7'],
-  ['lt_c_aisfldc', '경량항공기 이착륙장', '#78350f'], ['lt_c_aistemp', '임시비행금지', '#dc2626'],
-  ['lt_c_aisuac', 'UA 공역', '#16a34a'], ['lt_c_aisdronezone', '드론시범구역', '#15803d'],
-  ['lt_c_wgisnpgug', '국립공원', '#4d7c0f'], ['lt_c_uo301', '국가유산', '#22c55e'], ['lt_c_aisport', '항만', '#1d4ed8'],
-];
-const wms = {};
-for (const [id] of EXTRA) {
-  wms[id] = L.tileLayer.wms('/api/wms', { layers: id, format: 'image/png', transparent: true, version: '1.3.0',
-    opacity: 0.85, maxZoom: 18, attribution: '추가 레이어: 브이월드' }).addTo(map);
-}
-(function renderLegend2() {
-  const el = document.getElementById('legend2');
-  for (const [id, label, hex] of EXTRA) {
-    const chip = document.createElement('div');
-    chip.className = 'chip';
-    chip.innerHTML = `<span class="dot" style="background:${hex}"></span>${label}`;
-    chip.onclick = () => {
-      const on = map.hasLayer(wms[id]);
-      on ? map.removeLayer(wms[id]) : map.addLayer(wms[id]);
-      chip.classList.toggle('off', on);
-    };
-    el.appendChild(chip);
-  }
-})();
-
-const groups = {};
-KINDS.forEach(k => groups[k.kind] = L.layerGroup().addTo(map));
-let marker = null;
-
-function esc(s) { return String(s ?? '').replace(/[&<>"]/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;' }[c])); }
-
-function ringArea(r) { // 대략 넓이 (정렬용)
-  let a = 0; for (let i = 0, j = r.length - 1; i < r.length; j = i++) a += (r[j][0] + r[i][0]) * (r[j][1] - r[i][1]);
-  return Math.abs(a / 2);
-}
-
-async function loadZones() {
-  try {
-    const res = await fetch('/api/zones');
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || res.status);
-    const counts = {};
-    // 넓은 구역을 먼저 그려서 작은 구역이 위에 오게
-    data.features.sort((a, b) => ringArea(b.geometry.coordinates[0]) - ringArea(a.geometry.coordinates[0]));
-    for (const f of data.features) {
-      const p = f.properties;
-      const k = KINDS.find(x => x.kind === p.kind) || KINDS[0];
-      counts[p.kind] = (counts[p.kind] || 0) + 1;
-      L.geoJSON(f, { style: { color: k.hex, weight: 1.5, fillColor: k.hex, fillOpacity: 0.18 } })
-        .bindPopup(`<b>${esc(p.id.replace(/^RK /, ''))}</b> ${esc(p.kind === '관제권' ? '' : p.name)}<br>${esc(p.kind)}`
-          + (p.vertical ? `<br><small>고도: ${esc(p.vertical)}</small>` : ''))
-        .on('click', e => { L.DomEvent.stopPropagation(e); check(e.latlng.lat, e.latlng.lng); })
-        .addTo(groups[k.kind]);
-    }
-    document.getElementById('meta').textContent =
-      `eAIP ${data.pkg.slice(0, 10)} 발효판 · 구역 ${data.count}개 · 우리 API(/api/zones)`;
-    renderLegend(counts);
-  } catch (e) {
-    document.getElementById('meta').textContent = '공역을 불러오지 못했어요: ' + e.message;
-  }
-}
-
-function renderLegend(counts) {
-  const el = document.getElementById('legend');
-  el.innerHTML = '';
-  for (const k of KINDS) {
-    const chip = document.createElement('div');
-    chip.className = 'chip';
-    chip.innerHTML = `<span class="dot" style="background:${k.hex}"></span>${k.kind} ${counts[k.kind] || 0}`;
-    chip.onclick = () => {
-      const on = map.hasLayer(groups[k.kind]);
-      on ? map.removeLayer(groups[k.kind]) : map.addLayer(groups[k.kind]);
-      chip.classList.toggle('off', on);
-    };
-    el.appendChild(chip);
-  }
-}
-
-function showResult(html) {
-  document.getElementById('resultBody').innerHTML = html;
-  document.getElementById('result').style.display = 'block';
-}
-document.querySelector('#result .close').onclick = () => document.getElementById('result').style.display = 'none';
-
-async function check(lat, lon, q) {
-  showResult('판정하는 중…');
-  try {
-    const url = q ? `/api/check?q=${encodeURIComponent(q)}` : `/api/check?lat=${lat}&lon=${lon}`;
-    const res = await fetch(url);
-    const d = await res.json();
-    if (!res.ok) throw new Error(d.error || res.status);
-    if (marker) marker.remove();
-    marker = L.marker([d.lat, d.lon]).addTo(map);
-    if (q) map.setView([d.lat, d.lon], 12);
-    const [title, desc] = VERDICT[d.verdict];
-    const fmtL = h => `${esc(h.layer.name)}${h.labels.length ? ' (' + esc(h.labels.join(', ')) + ')' : ''}`;
-    const hits = [...d.hits.map(h => '• ' + fmtL(h)), ...(d.greens || []).map(h => '✅ ' + fmtL(h)),
-      ...(d.notes || []).map(h => '⚠️ 협의 필요: ' + fmtL(h))].join('<br>');
-    const where = d.place ? `📍 ${esc(d.place.name)}<br><small>${esc(d.place.address || '')}</small><br>` : '';
-    showResult(`${where}<div class="v">${title}</div>${esc(desc)}${hits ? '<br>' + hits : ''}`
-      + `<br><small>${d.lat.toFixed(5)}, ${d.lon.toFixed(5)}</small>`);
-  } catch (e) {
-    showResult('판정 실패: ' + esc(e.message));
-  }
-}
-
-map.on('click', e => check(e.latlng.lat, e.latlng.lng));
-document.getElementById('search').onsubmit = e => {
-  e.preventDefault();
-  const q = document.getElementById('q').value.trim();
-  if (q) check(null, null, q);
-};
-document.getElementById('me').onclick = () => {
-  if (!navigator.geolocation) return showResult('이 브라우저는 위치를 지원하지 않아요');
-  navigator.geolocation.getCurrentPosition(
-    p => { map.setView([p.coords.latitude, p.coords.longitude], 13); check(p.coords.latitude, p.coords.longitude); },
-    () => showResult('위치 권한이 없어서 내 위치를 못 가져왔어요'));
-};
-
-loadZones();
-</script>
+<main>
+  <h1>🚁 드론봇</h1>
+  <p>카카오톡 채널 <b>@드론봇</b>에 장소 이름을 보내면<br>드론 비행 가능 여부를 알려드려요.</p>
+  <span class="ok">스킬 서버 작동 중</span>
+</main>
 </body>
 </html>
