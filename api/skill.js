@@ -3,11 +3,13 @@
 
 import { geocode } from '../lib/geocode.js';
 import { checkAirspace } from '../lib/aip.js';
+import { checkExtra, mergeResults } from '../lib/extra.js';
 import { extractPlace, buildAnswer, kakaoCard, kakaoText } from '../lib/message.js';
 
 const HELP = '장소를 보내주세요!\n예) 여의도 한강공원\n예) 부산 광안리 드론 돼?\n예) 서울 마포구 상암동';
 
 export async function handle(body, env = process.env) {
+  const start = Date.now();
   // 오픈빌더에서 'place' 파라미터를 설정했다면 그걸 우선 사용
   const param = body?.action?.params?.place;
   const utterance = body?.userRequest?.utterance || '';
@@ -19,8 +21,10 @@ export async function handle(body, env = process.env) {
   const [place] = await Promise.all([geocode(query, env), checkAirspace(127, 37).catch(() => null)]);
   if (!place) return kakaoText(`"${query}" 위치를 못 찾았어요 😥\n동네 이름이나 주소로 다시 보내주세요.`);
 
-  const result = await checkAirspace(place.x, place.y);
-  return kakaoCard(buildAnswer(place, result));
+  // 추가 레이어는 남은 시간 안에서만 조회 (카카오 5초 제한)
+  const left = 4300 - (Date.now() - start);
+  const [core, extra] = await Promise.all([checkAirspace(place.x, place.y), checkExtra(place.x, place.y, env, left)]);
+  return kakaoCard(buildAnswer(place, mergeResults(core, extra)));
 }
 
 export default async function handler(req, res) {
