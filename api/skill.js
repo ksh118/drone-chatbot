@@ -2,7 +2,7 @@
 // 주소: https://<내프로젝트>.vercel.app/api/skill
 
 import { geocode } from '../lib/geocode.js';
-import { checkAirspace } from '../lib/airspace.js';
+import { checkAirspace } from '../lib/aip.js';
 import { extractPlace, buildAnswer, kakaoCard, kakaoText } from '../lib/message.js';
 
 const HELP = '장소를 보내주세요!\n예) 여의도 한강공원\n예) 부산 광안리 드론 돼?\n예) 서울 마포구 상암동';
@@ -14,12 +14,12 @@ export async function handle(body, env = process.env) {
   const query = (param || extractPlace(utterance)).trim();
 
   if (!query || query.length < 2) return kakaoText(HELP);
-  if (!env.VWORLD_KEY) return kakaoText('서버 설정 오류: VWORLD_KEY가 없어요.');
 
-  const place = await geocode(query, env);
+  // 공역 데이터는 장소 검색과 동시에 미리 읽어 둠 (응답 시간 단축)
+  const [place] = await Promise.all([geocode(query, env), checkAirspace(127, 37).catch(() => null)]);
   if (!place) return kakaoText(`"${query}" 위치를 못 찾았어요 😥\n동네 이름이나 주소로 다시 보내주세요.`);
 
-  const result = await checkAirspace(place.x, place.y, env);
+  const result = await checkAirspace(place.x, place.y);
   return kakaoCard(buildAnswer(place, result));
 }
 
