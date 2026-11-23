@@ -1,7 +1,7 @@
 {
   "name": "drone-kakao-chatbot",
   "version": "1.0.0",
-  "description": "카카오톡 채널 드론 비행가능지역 안내 챗봇 (V-World 공역 조회)",
+  "description": "카카오톡 채널 드론 비행가능지역 안내 챗봇 (eAIP 기반 자체 공역 판정, API 키 불필요)",
   "type": "module",
   "private": true,
   "engines": { "node": ">=18" },
