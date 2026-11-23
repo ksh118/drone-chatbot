@@ -4,7 +4,7 @@
 import { geocode } from '../lib/geocode.js';
 import { checkAirspace } from '../lib/aip.js';
 import { checkExtra, mergeResults } from '../lib/extra.js';
-import { extractPlace, buildAnswer, kakaoCard, kakaoText } from '../lib/message.js';
+import { extractPlace, buildAnswer, kakaoCard, kakaoText, menuAnswer, welcome } from '../lib/message.js';
 
 const HELP = '장소를 보내주세요!\n예) 여의도 한강공원\n예) 부산 광안리 드론 돼?\n예) 서울 마포구 상암동';
 
@@ -13,6 +13,11 @@ export async function handle(body, env = process.env) {
   // 오픈빌더에서 'place' 파라미터를 설정했다면 그걸 우선 사용
   const param = body?.action?.params?.place;
   const utterance = body?.userRequest?.utterance || '';
+  // 웰컴 블록(채팅방 처음 들어올 때)이나 메뉴 버튼이면 안내 답변
+  const blockName = body?.intent?.name || body?.userRequest?.block?.name || '';
+  if (/웰컴|welcome/i.test(blockName)) return welcome();
+  const menu = !param && menuAnswer(utterance);
+  if (menu) return menu;
   const query = (param || extractPlace(utterance)).trim();
 
   if (!query || query.length < 2) return kakaoText(HELP);
