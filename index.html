@@ -48,6 +48,7 @@
       <button type="button" id="me">📍 내 위치</button>
     </form>
     <div class="legend" id="legend"></div>
+    <div class="legend" id="legend2"></div>
     <div class="note">지도를 누르면 그 지점을 판정해요. 참고용이에요. 비행 전 노탐(NOTAM)과 드론 원스톱을 꼭 확인하세요.</div>
   </header>
   <div id="map"></div>
@@ -74,6 +75,34 @@ const map = L.map('map', { zoomControl: true }).setView([36.4, 127.8], 7);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
   maxZoom: 18, attribution: '© OpenStreetMap contributors · 공역: 국토교통부 eAIP',
 }).addTo(map);
+
+// 원스톱과 같은 추가 레이어 (브이월드 WMS, 우리 서버 /api/wms 가 중계)
+const EXTRA = [
+  ['lt_c_aisobls', '장애물공역', '#111827'], ['lt_c_aisatzc', '비행장교통구역', '#64748b'],
+  ['lt_c_aisaltc', '경계구역', '#0ea5e9'], ['lt_c_aispca', '사전협의구역', '#a855f7'],
+  ['lt_c_aisfldc', '경량항공기 이착륙장', '#78350f'], ['lt_c_aistemp', '임시비행금지', '#dc2626'],
+  ['lt_c_aisuac', 'UA 공역', '#16a34a'], ['lt_c_aisdronezone', '드론시범구역', '#15803d'],
+  ['lt_c_wgisnpgug', '국립공원', '#4d7c0f'], ['lt_c_uo301', '국가유산', '#22c55e'], ['lt_c_aisport', '항만', '#1d4ed8'],
+];
+const wms = {};
+for (const [id] of EXTRA) {
+  wms[id] = L.tileLayer.wms('/api/wms', { layers: id, format: 'image/png', transparent: true, version: '1.3.0',
+    opacity: 0.85, maxZoom: 18, attribution: '추가 레이어: 브이월드' }).addTo(map);
+}
+(function renderLegend2() {
+  const el = document.getElementById('legend2');
+  for (const [id, label, hex] of EXTRA) {
+    const chip = document.createElement('div');
+    chip.className = 'chip';
+    chip.innerHTML = `<span class="dot" style="background:${hex}"></span>${label}`;
+    chip.onclick = () => {
+      const on = map.hasLayer(wms[id]);
+      on ? map.removeLayer(wms[id]) : map.addLayer(wms[id]);
+      chip.classList.toggle('off', on);
+    };
+    el.appendChild(chip);
+  }
+})();
 
 const groups = {};
 KINDS.forEach(k => groups[k.kind] = L.layerGroup().addTo(map));
@@ -145,7 +174,9 @@ async function check(lat, lon, q) {
     marker = L.marker([d.lat, d.lon]).addTo(map);
     if (q) map.setView([d.lat, d.lon], 12);
     const [title, desc] = VERDICT[d.verdict];
-    const hits = d.hits.map(h => `• ${esc(h.layer.name)} (${esc(h.labels.join(', '))})`).join('<br>');
+    const fmtL = h => `${esc(h.layer.name)}${h.labels.length ? ' (' + esc(h.labels.join(', ')) + ')' : ''}`;
+    const hits = [...d.hits.map(h => '• ' + fmtL(h)), ...(d.greens || []).map(h => '✅ ' + fmtL(h)),
+      ...(d.notes || []).map(h => '⚠️ 협의 필요: ' + fmtL(h))].join('<br>');
     const where = d.place ? `📍 ${esc(d.place.name)}<br><small>${esc(d.place.address || '')}</small><br>` : '';
     showResult(`${where}<div class="v">${title}</div>${esc(desc)}${hits ? '<br>' + hits : ''}`
       + `<br><small>${d.lat.toFixed(5)}, ${d.lon.toFixed(5)}</small>`);
