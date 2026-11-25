@@ -1,12 +1,14 @@
 // 지도용 브이월드 WMS 중계 (키는 서버에서만 붙임, 브라우저에 노출 안 됨)
 // GET /api/wms?layers=lt_c_uo301&bbox=...&width=256&height=256 (Leaflet WMS 요청 그대로)
 import { EXTRA_LAYERS } from '../lib/extra.js';
+import { guard } from '../lib/guard.js';
 
 const ALLOWED = new Set([...EXTRA_LAYERS.map(l => l.id),
   'lt_c_aisprhc', 'lt_c_aisresc', 'lt_c_aisctrc', 'lt_c_aisatzc', 'lt_c_aisaltc', 'lt_c_aisdngc',
   'lt_c_aisfldc', 'lt_c_aispca', 'lt_c_aisuac', 'lt_c_aisport']);
 
 export default async function handler(req, res) {
+  if (!guard(req, res, 'wms', 900)) return;
   const q = req.query || {};
   const layer = String(q.layers || q.LAYERS || '').toLowerCase();
   const bbox = String(q.bbox || q.BBOX || '');
