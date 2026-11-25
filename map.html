@@ -55,7 +55,7 @@
   table{width:100%;border-collapse:collapse;font-size:14px}
   th{width:88px;text-align:left;vertical-align:top;color:#666;font-weight:600;padding:10px 8px 10px 0;border-top:1px solid #f0f0f0;line-height:1.4}
   td{padding:10px 0;border-top:1px solid #f0f0f0;line-height:1.55;word-break:keep-all}
-  td a{color:#1f6feb;text-decoration:none;font-weight:600}
+  td a{color:#1f6feb;text-decoration:none;font-weight:600;white-space:nowrap}
   td .muted{color:#999}
   td ul{margin:0;padding-left:16px}
   td li{margin:2px 0}
@@ -165,10 +165,16 @@ const telLink = s => esc(s).replace(/(0\d{1,2}-\d{3,4}-\d{4})/g, m => `<a href="
 const list = arr => arr == null ? '<span class="muted">불러오지 못했어요</span>' : arr.length ? arr.map(telLink).join('<br>') : '<span class="muted">없음</span>';
 
 let marker = null, reqId = 0;
-async function showSpot(lat, lon, name) {
+async function showSpot(lat, lon, name, opts = {}) {
   cur = { lat, lon, name: name || '' };
   if (marker) marker.setLatLng([lat, lon]); else marker = L.marker([lat, lon]).addTo(map);
   $('sheet').classList.remove('min');
+  if (opts.center) {
+    // 핀이 아래 정보창에 가리지 않게 화면 위쪽에 보이도록
+    const h = map.getSize().y * 0.55;
+    const pt = map.project([lat, lon], map.getZoom()).add([0, h / 2]);
+    map.setView(map.unproject(pt, map.getZoom()), map.getZoom(), { animate: false });
+  }
   $('head').innerHTML = `<div class="title">${name ? `<span class="name">${esc(name)}</span>` : ''}<span class="sub" style="margin:0"><span class="spin"></span>구역·담당자 확인 중…</span></div>`;
   $('body').innerHTML = '';
   const my = ++reqId;
@@ -213,12 +219,12 @@ $('sform').onsubmit = async e => {
   items.forEach(it => {
     const b = document.createElement('button');
     b.innerHTML = `<b>${esc(it.name)}</b><span>${esc(it.address)}</span>`;
-    b.onclick = () => { box.style.display = 'none'; map.setView([it.lat, it.lon], Math.max(map.getZoom(), 14)); showSpot(it.lat, it.lon, it.name); };
+    b.onclick = () => { box.style.display = 'none'; map.setZoom(Math.max(map.getZoom(), 14), { animate: false }); showSpot(it.lat, it.lon, it.name, { center: true }); };
     box.appendChild(b);
   });
 };
 
-if (hasPoint) showSpot(qlat, qlon, (q.get('name') || '').slice(0, 40));
+if (hasPoint) showSpot(qlat, qlon, (q.get('name') || '').slice(0, 40), { center: true });
 </script>
 </body>
 </html>
