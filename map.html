@@ -2,86 +2,223 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <title>드론봇 지도</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <style>
-  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:#222}
-  #map{position:absolute;inset:0}
-  .top{position:absolute;z-index:1000;left:12px;right:12px;top:12px;background:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 4px 16px rgba(0,0,0,.12)}
-  .name{font-size:17px;font-weight:700;margin:0 0 6px}
-  .chip{display:inline-block;padding:4px 10px;border-radius:999px;color:#fff;font-size:13px;font-weight:700}
-  .red{background:#e8483c}.orange{background:#f06a30}.green{background:#2eaa62}.unknown{background:#8b949e}
-  .zones{font-size:13px;color:#555;margin-top:6px;line-height:1.5}
-  .bottom{position:absolute;z-index:1000;left:12px;right:12px;bottom:14px;display:flex;flex-direction:column;gap:8px}
-  .legend{background:#fff;border-radius:12px;padding:8px 12px;font-size:12px;color:#444;box-shadow:0 2px 10px rgba(0,0,0,.1);display:flex;flex-wrap:wrap;gap:10px}
-  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
-  .btns{display:flex;gap:8px}
-  .btns a{flex:1;text-align:center;background:#fff;color:#222;text-decoration:none;font-size:14px;font-weight:600;padding:13px 0;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.1)}
-  .note{font-size:11px;color:#666;background:rgba(255,255,255,.9);border-radius:8px;padding:6px 10px}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:#1d1d1f;-webkit-tap-highlight-color:transparent}
+  #map{position:absolute;inset:0;background:#e9eef2}
+  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer}
+
+  /* 검색 */
+  .search{position:absolute;z-index:1001;left:12px;right:12px;top:calc(12px + env(safe-area-inset-top))}
+  .sbox{display:flex;background:#fff;border-radius:14px;box-shadow:0 3px 14px rgba(0,0,0,.14);overflow:hidden}
+  .sbox input{flex:1;border:0;outline:0;font-size:16px;padding:14px 16px;min-width:0}
+  .sbox button{padding:0 16px;font-weight:700;color:#1f6feb}
+  .results{margin-top:6px;background:#fff;border-radius:14px;box-shadow:0 3px 14px rgba(0,0,0,.14);max-height:50vh;overflow:auto;display:none}
+  .results button{display:block;width:100%;text-align:left;padding:12px 16px;border-bottom:1px solid #f0f0f0}
+  .results b{display:block;font-size:15px}
+  .results span{font-size:12.5px;color:#777}
+  .results .empty{padding:14px 16px;font-size:14px;color:#777}
+
+  /* 오른쪽 버튼 */
+  .tools{position:absolute;z-index:1000;right:12px;top:calc(76px + env(safe-area-inset-top));display:flex;flex-direction:column;gap:8px}
+  .tools button{width:46px;height:46px;border-radius:12px;background:#fff;box-shadow:0 2px 10px rgba(0,0,0,.14);font-size:12px;font-weight:700;line-height:1.1}
+  .tools button.on{background:#1d1d1f;color:#fff}
+
+  /* 레이어 패널 */
+  .layers{position:absolute;z-index:1002;right:66px;top:calc(76px + env(safe-area-inset-top));background:#fff;border-radius:14px;box-shadow:0 3px 14px rgba(0,0,0,.16);padding:10px 12px;display:none;width:220px}
+  .layers h4{margin:2px 0 8px;font-size:14px}
+  .layers label{display:flex;align-items:center;gap:8px;font-size:13.5px;padding:6px 0}
+  .layers i{width:12px;height:12px;border-radius:3px;display:inline-block;flex:none}
+
+  /* 정보 시트 */
+  .sheet{position:absolute;z-index:1003;left:0;right:0;bottom:0;background:#fff;border-radius:20px 20px 0 0;box-shadow:0 -4px 20px rgba(0,0,0,.14);max-height:62vh;display:flex;flex-direction:column;padding-bottom:env(safe-area-inset-bottom);transition:transform .2s}
+  .sheet.min .body{display:none}
+  .handle{padding:10px 0 4px;display:flex;justify-content:center}
+  .handle span{width:40px;height:5px;border-radius:3px;background:#d5d5d8}
+  .head{padding:4px 18px 12px}
+  .hint{font-size:14px;color:#666;padding:2px 0 6px}
+  .title{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .name{font-size:18px;font-weight:800}
+  .chip{display:inline-block;padding:5px 11px;border-radius:999px;color:#fff;font-size:13.5px;font-weight:800}
+  .red{background:#e5484d}.orange{background:#f07a1a}.green{background:#22a55b}.unknown{background:#8b949e}.note{background:#6e7781}
+  .sub{font-size:13.5px;color:#555;margin-top:6px}
+  .body{overflow:auto;padding:0 18px 12px}
+  .zones{display:flex;flex-wrap:wrap;gap:6px;margin:2px 0 10px}
+  .zone{font-size:12.5px;padding:5px 9px;border-radius:8px;border:1px solid #e3e3e6;background:#fafafa}
+  .zone em{font-style:normal;font-weight:700}
+  .zone.red em{color:#d1343a}.zone.orange em{color:#d86a10}.zone.green em{color:#178a49}.zone.note em{color:#555}
+  .zone.red,.zone.orange,.zone.green,.zone.note{background:#fafafa}
+  .warn{background:#fff1f1;color:#b4232a;border-radius:10px;padding:10px 12px;font-size:13.5px;font-weight:600;margin-bottom:10px;line-height:1.5}
+  table{width:100%;border-collapse:collapse;font-size:14px}
+  th{width:88px;text-align:left;vertical-align:top;color:#666;font-weight:600;padding:10px 8px 10px 0;border-top:1px solid #f0f0f0;line-height:1.4}
+  td{padding:10px 0;border-top:1px solid #f0f0f0;line-height:1.55;word-break:keep-all}
+  td a{color:#1f6feb;text-decoration:none;font-weight:600}
+  td .muted{color:#999}
+  td ul{margin:0;padding-left:16px}
+  td li{margin:2px 0}
+  .btns{display:flex;gap:8px;padding:10px 18px 12px}
+  .btns a{flex:1;text-align:center;text-decoration:none;font-size:14.5px;font-weight:700;padding:13px 0;border-radius:12px;background:#f2f2f4;color:#1d1d1f}
+  .btns a.primary{background:#1d1d1f;color:#fff}
+  .foot{font-size:11px;color:#888;padding:0 18px 10px;line-height:1.5}
+  .spin{display:inline-block;width:14px;height:14px;border:2px solid #ccc;border-top-color:#555;border-radius:50%;animation:s .7s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes s{to{transform:rotate(360deg)}}
+  .toast{position:absolute;z-index:1100;left:50%;top:40%;transform:translateX(-50%);background:rgba(0,0,0,.8);color:#fff;padding:10px 16px;border-radius:10px;font-size:14px;display:none}
+  .leaflet-control-attribution{font-size:10px}
 </style>
 </head>
 <body>
 <div id="map"></div>
 
-<div class="top">
-  <p class="name" id="name">위치</p>
-  <span class="chip unknown" id="chip">확인 중</span>
-  <div class="zones" id="zones"></div>
+<div class="search">
+  <form class="sbox" id="sform">
+    <input id="q" type="search" placeholder="장소·주소 검색 (예: 여의도한강공원)" autocomplete="off" enterkeyhint="search">
+    <button type="submit">검색</button>
+  </form>
+  <div class="results" id="results"></div>
 </div>
 
-<div class="bottom">
-  <div class="legend">
-    <span><i style="background:#e8483c"></i>비행금지</span>
-    <span><i style="background:#f06a30"></i>승인 필요(제한·관제권 등)</span>
-    <span><i style="background:#2eaa62"></i>비행 가능 공역</span>
-  </div>
-  <div class="btns">
-    <a href="https://drone.onestop.go.kr/common/flightArea" target="_blank" rel="noopener">드론 원스톱 지도</a>
-    <a href="https://drone.onestop.go.kr/civilappeal/flight/register" target="_blank" rel="noopener">비행승인 신청</a>
-  </div>
-  <div class="note">참고용 지도예요. 비행 전 드론 원스톱과 노탐(NOTAM)을 꼭 확인해 주세요. · 데이터: 국토교통부 eAIP, 브이월드 · 지도 © OpenStreetMap</div>
+<div class="tools">
+  <button id="bBase" title="위성 지도">위성</button>
+  <button id="bLayers" title="구역 레이어">구역</button>
+  <button id="bShare" title="링크 복사">공유</button>
 </div>
+
+<div class="layers" id="layers"><h4>지도에 표시할 구역</h4></div>
+
+<div class="sheet" id="sheet">
+  <div class="handle" id="handle"><span></span></div>
+  <div class="head" id="head"><div class="hint">지도를 누르면 그 위치의 구역·담당자 정보가 나와요.</div></div>
+  <div class="body" id="body"></div>
+  <div class="btns">
+    <a class="primary" href="https://drone.onestop.go.kr/civilappeal/flight/register" target="_blank" rel="noopener">비행승인 신청</a>
+    <a href="https://drone.onestop.go.kr/common/flightArea" target="_blank" rel="noopener">드론 원스톱 지도</a>
+  </div>
+  <div class="foot">참고용 정보예요. 실제 비행 전 드론 원스톱과 노탐(NOTAM)을 꼭 확인해 주세요.<br>지도·구역·주소: 브이월드(국토교통부) · 담당자: 드론 원스톱(국토교통부)</div>
+</div>
+<div class="toast" id="toast"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const toast = (t, ms = 1600) => { const el = $('toast'); el.textContent = t; el.style.display = 'block'; clearTimeout(toast.t); toast.t = setTimeout(() => el.style.display = 'none', ms); };
+
 const q = new URLSearchParams(location.search);
-const lat = parseFloat(q.get('lat')), lon = parseFloat(q.get('lon'));
-const name = (q.get('name') || '선택한 위치').slice(0, 40);
-const ok = isFinite(lat) && isFinite(lon) && lat > 32 && lat < 39.5 && lon > 124 && lon < 132.5;
-const center = ok ? [lat, lon] : [36.4, 127.9];
+const qlat = parseFloat(q.get('lat')), qlon = parseFloat(q.get('lon'));
+const inKorea = (la, lo) => isFinite(la) && isFinite(lo) && la > 32 && la < 39.5 && lo > 123 && lo < 132.5;
+const hasPoint = inKorea(qlat, qlon);
 
-const map = L.map('map', { zoomControl: false }).setView(center, ok ? 12 : 7);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
+const map = L.map('map', { zoomControl: false, minZoom: 6, maxZoom: 19, maxBounds: [[30, 120], [41, 135]] })
+  .setView(hasPoint ? [qlat, qlon] : [36.4, 127.9], hasPoint ? 13 : 7);
+map.attributionControl.setPrefix(false);
 
-// 브이월드 공역 레이어 (드론 원스톱 지도와 같은 데이터)
-['lt_c_aistemp', 'lt_c_aisobls', 'lt_c_aisdronezone', 'lt_c_wgisnpgug', 'lt_c_uo301'].forEach(layer =>
-  L.tileLayer.wms('/api/wms', { layers: layer, format: 'image/png', transparent: true, opacity: 0.7, minZoom: 9 }).addTo(map));
+// 브이월드 배경지도 (일반 / 위성)
+const tile = type => L.tileLayer(`/api/vworld?op=tile&type=${type}&z={z}&y={y}&x={x}`, { minZoom: 6, maxZoom: 19, attribution: '© 브이월드(국토교통부)' });
+const base = tile('Base').addTo(map);
+const sat = L.layerGroup([tile('Satellite'), tile('Hybrid')]);
+$('bBase').onclick = () => {
+  const on = map.hasLayer(sat);
+  if (on) { map.removeLayer(sat); base.addTo(map); $('bBase').classList.remove('on'); }
+  else { map.removeLayer(base); sat.addTo(map); $('bBase').classList.add('on'); }
+  Object.values(groups).forEach(g => g.on && g.layers.forEach(l => l.bringToFront()));
+};
 
-// 비행금지·제한구역, 관제권 (eAIP)
-const COLOR = { red: '#e8483c', orange: '#f06a30', green: '#2eaa62' };
-fetch('/api/zones').then(r => r.json()).then(g => {
-  L.geoJSON(g, {
-    style: f => ({ color: COLOR[f.properties.level] || '#888', weight: 1.5, fillOpacity: 0.12 }),
-    onEachFeature: (f, l) => l.bindTooltip(`${f.properties.kind} ${f.properties.id}`, { sticky: true }),
-  }).addTo(map);
-}).catch(() => {});
+// 브이월드 공역 레이어 (드론 원스톱 지도와 같은 레이어)
+const GROUPS = [
+  { id: 'ban', name: '비행금지·제한구역', color: '#e5484d', on: true, layers: ['lt_c_aisprhc', 'lt_c_aisresc', 'lt_c_aistemp'], minZoom: 6 },
+  { id: 'ctr', name: '관제권·비행장·위험구역', color: '#f07a1a', on: true, layers: ['lt_c_aisctrc', 'lt_c_aisatzc', 'lt_c_aisaltc', 'lt_c_aisdngc', 'lt_c_aisfldc'], minZoom: 6 },
+  { id: 'uac', name: '초경량비행장치 비행공역', color: '#22a55b', on: true, layers: ['lt_c_aisuac'], minZoom: 6 },
+  { id: 'drz', name: '드론 특별자유화구역', color: '#2f81f7', on: true, layers: ['lt_c_aisdronezone'], minZoom: 6 },
+  { id: 'etc', name: '장애물공역·사전협의구역', color: '#8957e5', on: false, layers: ['lt_c_aisobls', 'lt_c_aispca'], minZoom: 8 },
+  { id: 'park', name: '국립공원', color: '#3f9142', on: false, layers: ['lt_c_wgisnpgug'], minZoom: 9 },
+  { id: 'heri', name: '국가유산 보호구역', color: '#a0522d', on: false, layers: ['lt_c_uo301'], minZoom: 11 },
+  { id: 'port', name: '항만', color: '#0e7490', on: false, layers: ['lt_c_aisport'], minZoom: 9 },
+];
+const groups = {};
+GROUPS.forEach(g => {
+  g.layers = g.layers.map(id => L.tileLayer.wms('/api/wms', { layers: id, format: 'image/png', transparent: true, opacity: 0.75, minZoom: g.minZoom, maxZoom: 19 }));
+  if (g.on) g.layers.forEach(l => l.addTo(map));
+  groups[g.id] = g;
+  const lab = document.createElement('label');
+  lab.innerHTML = `<input type="checkbox" ${g.on ? 'checked' : ''}><i style="background:${g.color}"></i>${esc(g.name)}`;
+  lab.querySelector('input').onchange = e => { g.on = e.target.checked; g.layers.forEach(l => g.on ? l.addTo(map) : map.removeLayer(l)); };
+  $('layers').appendChild(lab);
+});
+$('bLayers').onclick = () => { const el = $('layers'); const show = el.style.display !== 'block'; el.style.display = show ? 'block' : 'none'; $('bLayers').classList.toggle('on', show); };
 
-document.getElementById('name').textContent = name;
-if (ok) {
-  L.marker(center).addTo(map).bindPopup(name).openPopup();
-  // 판정 다시 확인
-  fetch(`/api/check?lat=${lat}&lon=${lon}`).then(r => r.json()).then(j => {
-    const label = { red: '비행 불가', orange: '비행승인 필요', green: '비행 가능 구역', unknown: '확인 필요' }[j.verdict] || '확인 필요';
-    const chip = document.getElementById('chip');
-    chip.textContent = label; chip.className = 'chip ' + (j.verdict || 'unknown');
-    const zones = (j.hits || []).filter(h => h.layer && h.layer.level !== 'green')
-      .map(h => h.layer.name + (h.labels && h.labels.length ? `(${h.labels.filter(Boolean).join(', ')})` : ''));
-    document.getElementById('zones').textContent = zones.length ? '해당 구역: ' + zones.slice(0, 4).join(', ') : '해당 구역 없음';
-  }).catch(() => { document.getElementById('chip').textContent = '확인 실패'; });
-} else {
-  document.getElementById('chip').textContent = '위치 정보 없음';
+// 공유 (현재 선택한 위치 링크)
+let cur = hasPoint ? { lat: qlat, lon: qlon, name: q.get('name') || '' } : null;
+$('bShare').onclick = async () => {
+  const c = cur || { lat: map.getCenter().lat, lon: map.getCenter().lng, name: '' };
+  const url = `${location.origin}/map?lat=${c.lat.toFixed(5)}&lon=${c.lon.toFixed(5)}${c.name ? '&name=' + encodeURIComponent(c.name) : ''}`;
+  try { if (navigator.share) await navigator.share({ title: '드론봇 지도', url }); else { await navigator.clipboard.writeText(url); toast('링크를 복사했어요'); } }
+  catch { try { await navigator.clipboard.writeText(url); toast('링크를 복사했어요'); } catch { prompt('링크', url); } }
+};
+
+// 정보 시트
+$('handle').onclick = () => $('sheet').classList.toggle('min');
+const LABEL = { red: '비행금지구역', orange: '비행승인 필요', green: '비행승인 불필요', unknown: '확인 필요' };
+const telLink = s => esc(s).replace(/(0\d{1,2}-\d{3,4}-\d{4})/g, m => `<a href="tel:${m.replace(/-/g, '')}">${m}</a>`);
+const list = arr => arr == null ? '<span class="muted">불러오지 못했어요</span>' : arr.length ? arr.map(telLink).join('<br>') : '<span class="muted">없음</span>';
+
+let marker = null, reqId = 0;
+async function showSpot(lat, lon, name) {
+  cur = { lat, lon, name: name || '' };
+  if (marker) marker.setLatLng([lat, lon]); else marker = L.marker([lat, lon]).addTo(map);
+  $('sheet').classList.remove('min');
+  $('head').innerHTML = `<div class="title">${name ? `<span class="name">${esc(name)}</span>` : ''}<span class="sub" style="margin:0"><span class="spin"></span>구역·담당자 확인 중…</span></div>`;
+  $('body').innerHTML = '';
+  const my = ++reqId;
+  let d;
+  try { d = await fetch(`/api/spot?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`).then(r => r.json()); }
+  catch { d = { error: '연결 실패' }; }
+  if (my !== reqId) return;
+  if (d.error) { $('head').innerHTML = `<div class="title"><span class="chip unknown">확인 실패</span></div><div class="sub">잠시 후 다시 눌러 주세요.</div>`; return; }
+  $('head').innerHTML = `<div class="title">${name ? `<span class="name">${esc(name)}</span>` : ''}<span class="chip ${d.verdict}">${esc(d.title || LABEL[d.verdict])}</span></div><div class="sub">${esc(d.sub || '')}</div>`;
+  const zones = d.zones.length
+    ? `<div class="zones">${d.zones.map(z => `<span class="zone ${z.level}"><em>${esc(z.name)}</em>${z.label ? ' ' + esc(z.label) : ''}</span>`).join('')}</div>`
+    : `<div class="zones"><span class="zone green"><em>해당 구역 없음</em></span></div>`;
+  const warn = d.warn.length ? `<div class="warn">${d.warn.map(telLink).join('<br>')}</div>` : '';
+  $('body').innerHTML = zones + warn + `<table>
+    <tr><th>주소</th><td>${d.address ? esc(d.address) : '<span class="muted">주소가 검색되지 않았어요</span>'}</td></tr>
+    <tr><th>비행구역<br>담당자</th><td>${list(d.contacts.flight)}</td></tr>
+    <tr><th>특별비행<br>담당자</th><td>${list(d.contacts.special)}</td></tr>
+    <tr><th>항공촬영<br>담당자</th><td>${list(d.contacts.photo)}</td></tr>
+    <tr><th>비고</th><td><ul>${d.notes.map(n => `<li>${telLink(n)}</li>`).join('')}</ul></td></tr>
+  </table>`;
 }
+
+map.on('click', e => {
+  $('results').style.display = 'none';
+  $('layers').style.display = 'none'; $('bLayers').classList.remove('on');
+  showSpot(e.latlng.lat, e.latlng.lng, '');
+});
+
+// 장소 검색 (브이월드 검색 API)
+$('sform').onsubmit = async e => {
+  e.preventDefault();
+  const text = $('q').value.trim();
+  if (!text) return;
+  $('q').blur();
+  const box = $('results');
+  box.style.display = 'block';
+  box.innerHTML = '<div class="empty"><span class="spin"></span>검색 중…</div>';
+  let items = [];
+  try { items = (await fetch(`/api/vworld?op=search&q=${encodeURIComponent(text)}`).then(r => r.json())).items || []; } catch {}
+  if (!items.length) { box.innerHTML = '<div class="empty">검색 결과가 없어요. 다른 이름이나 주소로 찾아보세요.</div>'; return; }
+  box.innerHTML = '';
+  items.forEach(it => {
+    const b = document.createElement('button');
+    b.innerHTML = `<b>${esc(it.name)}</b><span>${esc(it.address)}</span>`;
+    b.onclick = () => { box.style.display = 'none'; map.setView([it.lat, it.lon], Math.max(map.getZoom(), 14)); showSpot(it.lat, it.lon, it.name); };
+    box.appendChild(b);
+  });
+};
+
+if (hasPoint) showSpot(qlat, qlon, (q.get('name') || '').slice(0, 40));
 </script>
 </body>
 </html>
