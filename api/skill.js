@@ -4,6 +4,7 @@
 import { geocode } from '../lib/geocode.js';
 import { checkAirspace } from '../lib/aip.js';
 import { checkExtra, mergeResults } from '../lib/extra.js';
+import { getWeather } from '../lib/weather.js';
 import { extractPlace, kakaoText, menuAnswer, welcome, verdictReply, noticeCard } from '../lib/message.js';
 
 const HELP = '확인할 장소 이름을 보내 주세요.\n\n예) 여의도한강공원\n예) 부산 광안리\n예) 서울 마포구 상암동';
@@ -28,8 +29,12 @@ export async function handle(body, env = process.env) {
 
   // 추가 레이어는 남은 시간 안에서만 조회 (카카오 5초 제한)
   const left = 4300 - (Date.now() - start);
-  const [core, extra] = await Promise.all([checkAirspace(place.x, place.y), checkExtra(place.x, place.y, env, left)]);
-  return verdictReply(place, mergeResults(core, extra));
+  const [core, extra, weather] = await Promise.all([
+    checkAirspace(place.x, place.y),
+    checkExtra(place.x, place.y, env, left),
+    getWeather(place.y, place.x, Math.min(1800, left)),
+  ]);
+  return verdictReply(place, mergeResults(core, extra), weather);
 }
 
 export default async function handler(req, res) {
