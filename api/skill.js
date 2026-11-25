@@ -5,7 +5,11 @@ import { geocode } from '../lib/geocode.js';
 import { checkAirspace } from '../lib/aip.js';
 import { checkExtra, mergeResults } from '../lib/extra.js';
 import { getWeather } from '../lib/weather.js';
+import { overLimit } from '../lib/guard.js';
 import { extractPlace, kakaoText, menuAnswer, welcome, verdictReply, noticeCard } from '../lib/message.js';
+
+// 우리 챗봇(오픈빌더 봇)에서 온 요청만 처리
+const BOT_ID = process.env.KAKAO_BOT_ID || '6b0441c7e3146b3ebc749d47';
 
 const HELP = '확인할 장소 이름을 보내 주세요.\n\n예) 여의도한강공원\n예) 부산 광안리\n예) 서울 마포구 상암동';
 
@@ -19,7 +23,7 @@ export async function handle(body, env = process.env) {
   if (/웰컴|welcome/i.test(blockName)) return welcome();
   const menu = !param && menuAnswer(utterance);
   if (menu) return menu;
-  const query = (param || extractPlace(utterance)).trim();
+  const query = String(param || extractPlace(utterance)).trim().slice(0, 60);
 
   if (!query || query.length < 2) return kakaoText(HELP);
 
@@ -39,11 +43,24 @@ export async function handle(body, env = process.env) {
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    res.status(200).send('드론 챗봇 스킬 서버 작동 중 ✅ (POST로 호출하세요)');
+    res.setHeader('Allow', 'POST');
+    res.status(405).send('POST only');
+    return;
+  }
+  let body;
+  try { body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body; } catch { body = null; }
+  if (!body || !String(body?.bot?.id || '').includes(BOT_ID)) {
+    console.warn('스킬 요청 거절: 봇 ID 불일치', String(body?.bot?.id || '').slice(0, 40));
+    res.status(403).json({ error: 'forbidden' });
+    return;
+  }
+  // 한 사용자가 1분에 20번 넘게 보내면 잠시 쉬게 함
+  const user = String(body?.userRequest?.user?.id || 'anon').slice(0, 80);
+  if (overLimit(`skill:${user}`, { max: 20 })) {
+    res.status(200).json(kakaoText('잠깐만요! 너무 빠르게 보내셨어요.\n1분 뒤에 다시 보내 주세요.'));
     return;
   }
   try {
-    const body = typeof req.body === 'string' ? JSON.parse(req.body) : req.body;
     res.status(200).json(await handle(body));
   } catch (e) {
     console.error(e);
