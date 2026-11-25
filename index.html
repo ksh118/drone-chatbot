@@ -2,22 +2,231 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>드론봇</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>드로니봇 · 드론, 여기서 날려도 될까?</title>
+<meta name="description" content="장소 이름만 보내면 드론 비행금지구역인지, 비행승인이 필요한지 카카오톡으로 바로 알려주는 드로니봇.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="드로니봇 · 드론, 여기서 날려도 될까?">
+<meta property="og:description" content="장소 이름만 보내면 비행 가능 여부를 카카오톡으로 바로 알려드려요.">
+<meta property="og:image" content="/img/menu_welcome.png">
+<meta name="theme-color" content="#ffffff">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/pretendard@1.3.9/dist/web/static/pretendard.min.css">
 <style>
-  html,body{margin:0;height:100%;background:#0f1115;color:#e8eaf0;
-    font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif}
-  main{max-width:440px;margin:0 auto;padding:56px 22px;text-align:center}
-  h1{font-size:22px;margin:0 0 8px}
-  p{color:#9aa3b2;font-size:14px;line-height:1.6;margin:0}
-  .ok{display:inline-block;margin-top:18px;padding:6px 12px;border-radius:999px;background:#14532d;color:#bbf7d0;font-size:13px}
+  *{box-sizing:border-box}
+  :root{--ink:#16181d;--sub:#5b616e;--line:#ebedf0;--bg:#f6f7f9;--blue:#2563eb;--red:#e5484d;--orange:#f07a1a;--green:#22a55b}
+  html{scroll-behavior:smooth}
+  body{margin:0;font-family:Pretendard,-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:var(--ink);background:#fff;-webkit-font-smoothing:antialiased;word-break:keep-all}
+  a{color:inherit}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 22px}
+
+  header{position:sticky;top:0;z-index:10;background:rgba(255,255,255,.92);backdrop-filter:saturate(180%) blur(12px);-webkit-backdrop-filter:saturate(180%) blur(12px);border-bottom:1px solid var(--line)}
+  header .wrap{display:flex;align-items:center;justify-content:space-between;height:60px}
+  .brand{font-weight:800;font-size:19px;letter-spacing:-.3px;text-decoration:none;display:flex;align-items:center;gap:8px}
+  .brand i{width:26px;height:26px;border-radius:8px;background:var(--ink);display:inline-grid;place-items:center}
+  nav a{text-decoration:none;font-size:15px;color:var(--sub);margin-left:18px}
+  nav a:hover{color:var(--ink)}
+
+  .hero{padding:64px 0 56px;background:linear-gradient(180deg,#fff 0%,var(--bg) 100%)}
+  .hero .wrap{display:grid;grid-template-columns:1.1fr .9fr;gap:48px;align-items:center}
+  .eyebrow{display:inline-block;font-size:13px;font-weight:700;color:var(--blue);background:#eaf1ff;padding:6px 10px;border-radius:8px}
+  h1{font-size:46px;line-height:1.2;letter-spacing:-1.2px;margin:16px 0 14px}
+  .lead{font-size:18px;line-height:1.65;color:var(--sub);margin:0 0 28px}
+  .cta{display:flex;gap:10px;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:52px;padding:0 22px;border-radius:14px;font-size:16px;font-weight:700;text-decoration:none}
+  .btn.kakao{background:#fee500;color:#191919}
+  .btn.line{background:#fff;border:1px solid #d9dce1}
+  .note{font-size:13px;color:#8a909b;margin-top:14px}
+
+  /* 채팅 미리보기 */
+  .phone{background:#b2c7da;border-radius:28px;padding:22px 16px;box-shadow:0 20px 50px rgba(20,30,60,.16);max-width:360px;justify-self:center;width:100%}
+  .row{display:flex;margin:8px 0}
+  .row.me{justify-content:flex-end}
+  .bubble{background:#fee500;border-radius:14px 4px 14px 14px;padding:10px 13px;font-size:15px;max-width:75%}
+  .bot{display:flex;gap:8px;align-items:flex-start}
+  .avatar{width:34px;height:34px;border-radius:12px;background:#fff;display:grid;place-items:center;flex:none}
+  .card{background:#fff;border-radius:4px 14px 14px 14px;overflow:hidden;width:250px}
+  .card .top{background:#fff4ec;padding:16px 14px;display:flex;align-items:center;gap:10px}
+  .badge{background:var(--orange);color:#fff;font-weight:800;font-size:15px;padding:6px 11px;border-radius:999px}
+  .card .tt{font-weight:800;font-size:15px}
+  .card .bd{padding:12px 14px;font-size:13px;line-height:1.7;color:#333}
+  .card .bt{border-top:1px solid #eee;text-align:center;font-size:13.5px;padding:10px 0;color:#333}
+
+  section{padding:72px 0}
+  h2{font-size:30px;letter-spacing:-.6px;margin:0 0 10px}
+  .sec-lead{color:var(--sub);font-size:16px;margin:0 0 32px;line-height:1.6}
+
+  .steps{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;counter-reset:s}
+  .step{background:var(--bg);border-radius:18px;padding:24px}
+  .step b{display:block;font-size:17px;margin:12px 0 6px}
+  .step p{margin:0;color:var(--sub);font-size:15px;line-height:1.6}
+  .num{width:30px;height:30px;border-radius:9px;background:var(--ink);color:#fff;display:grid;place-items:center;font-weight:800;font-size:14px}
+
+  .verdicts{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
+  .v{border:1px solid var(--line);border-radius:18px;padding:22px}
+  .v .chip{display:inline-block;color:#fff;font-weight:800;font-size:14px;padding:6px 12px;border-radius:999px}
+  .v p{color:var(--sub);font-size:15px;line-height:1.6;margin:12px 0 0}
+
+  .feats{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
+  .feat{display:flex;gap:14px;align-items:flex-start;padding:20px;border-radius:16px;background:var(--bg)}
+  .feat svg{flex:none}
+  .feat b{display:block;font-size:16px;margin-bottom:4px}
+  .feat span{color:var(--sub);font-size:14.5px;line-height:1.55}
+
+  .map-band{background:var(--ink);color:#fff;border-radius:24px;padding:40px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap}
+  .map-band h3{font-size:24px;margin:0 0 8px;letter-spacing:-.4px}
+  .map-band p{margin:0;color:#c3c8d2;font-size:15.5px;line-height:1.6}
+  .map-band .btn{background:#fff;color:var(--ink)}
+
+  details{border-bottom:1px solid var(--line);padding:18px 2px}
+  summary{font-size:16.5px;font-weight:700;cursor:pointer;list-style:none;display:flex;justify-content:space-between}
+  summary::after{content:"+";color:#9aa0aa;font-weight:400}
+  details[open] summary::after{content:"−"}
+  details p{color:var(--sub);font-size:15px;line-height:1.7;margin:10px 0 0}
+
+  .warn{background:#fff8eb;border:1px solid #f6e3bd;border-radius:16px;padding:18px 20px;font-size:14.5px;line-height:1.7;color:#6b5320}
+
+  footer{border-top:1px solid var(--line);padding:32px 0 44px;color:#8a909b;font-size:13.5px;line-height:1.8}
+  footer a{color:#5b616e;text-decoration:none;margin-right:14px}
+
+  @media (max-width:820px){
+    .hero{padding:40px 0}
+    .hero .wrap{grid-template-columns:1fr;gap:36px}
+    h1{font-size:34px}
+    .lead{font-size:16.5px}
+    .steps,.verdicts,.feats{grid-template-columns:1fr}
+    section{padding:52px 0}
+    h2{font-size:25px}
+    nav a.hide-m{display:none}
+    .map-band{padding:28px}
+    .btn{flex:1}
+  }
 </style>
 </head>
 <body>
+<header>
+  <div class="wrap">
+    <a class="brand" href="/" aria-label="드로니봇 홈">
+      <i><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round"><circle cx="5" cy="5" r="2.5"/><circle cx="19" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M7 7l3 3M17 7l-3 3M7 17l3-3M17 17l-3-3"/><rect x="9.5" y="9.5" width="5" height="5" rx="1.2"/></svg></i>
+      드로니봇
+    </a>
+    <nav>
+      <a class="hide-m" href="#how">사용법</a>
+      <a class="hide-m" href="#faq">자주 묻는 질문</a>
+      <a href="/map">지도</a>
+    </nav>
+  </div>
+</header>
+
 <main>
-  <h1>🚁 드론봇</h1>
-  <p>카카오톡 채널 <b>@드론봇</b>에 장소 이름을 보내면<br>드론 비행 가능 여부를 알려드려요.</p>
-  <span class="ok">스킬 서버 작동 중</span>
+  <div class="hero">
+    <div class="wrap">
+      <div>
+        <span class="eyebrow">카카오톡 드론 비행 안내</span>
+        <h1>드론, 여기서<br>날려도 될까?</h1>
+        <p class="lead">장소 이름만 보내면 비행금지구역인지, 비행승인이 필요한지 카카오톡으로 바로 알려드려요. 회원가입도, 앱 설치도 필요 없어요.</p>
+        <div class="cta">
+          <a class="btn kakao" href="https://pf.kakao.com/_xlZvxeX" target="_blank" rel="noopener">
+            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><path fill="#191919" d="M12 3C6.48 3 2 6.58 2 11c0 2.85 1.86 5.35 4.67 6.77-.2.74-.74 2.7-.85 3.12-.13.52.19.51.4.37.17-.11 2.66-1.8 3.73-2.53.67.1 1.35.15 2.05.15 5.52 0 10-3.58 10-8S17.52 3 12 3z"/></svg>
+            카카오톡 채널 추가
+          </a>
+          <a class="btn line" href="/map">지도로 확인하기</a>
+        </div>
+        <p class="note">무료 · 개인정보 수집 없음 · 국토교통부 공공데이터 기반</p>
+      </div>
+
+      <div class="phone" aria-label="채팅 예시">
+        <div class="row me"><div class="bubble">여의도한강공원</div></div>
+        <div class="row bot">
+          <div class="avatar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#16181d" stroke-width="2.2" stroke-linecap="round"><circle cx="5" cy="5" r="2.5"/><circle cx="19" cy="5" r="2.5"/><circle cx="5" cy="19" r="2.5"/><circle cx="19" cy="19" r="2.5"/><path d="M7 7l3 3M17 7l-3 3M7 17l3-3M17 17l-3-3"/><rect x="9.5" y="9.5" width="5" height="5" rx="1.2"/></svg></div>
+          <div class="card">
+            <div class="top"><span class="badge">비행승인 필요</span></div>
+            <div class="bd">
+              <div class="tt">여의도한강공원</div>
+              ▶ 해당 구역: 비행제한구역(R75)<br>
+              ▶ 현재 날씨: 맑음 · 바람 3m/s<br>
+              비행 전 드론 원스톱에서 승인을 받아 주세요.
+            </div>
+            <div class="bt">지도에서 확인</div>
+            <div class="bt">비행승인 신청</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <section id="how">
+    <div class="wrap">
+      <h2>이렇게 써요</h2>
+      <p class="sec-lead">카톡 친구에게 묻듯이 장소 이름을 보내면 끝이에요.</p>
+      <div class="steps">
+        <div class="step"><span class="num">1</span><b>채널 추가</b><p>카카오톡에서 ‘드로니봇’ 채널을 추가해요.</p></div>
+        <div class="step"><span class="num">2</span><b>장소 이름 보내기</b><p>“부산 광안리”, “서울 마포구 상암동”처럼 장소나 동네 이름을 보내요.</p></div>
+        <div class="step"><span class="num">3</span><b>결과 확인</b><p>비행 가능 여부와 해당 구역, 날씨를 알려드리고 승인 신청 페이지로 바로 연결해 드려요.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="background:var(--bg)">
+    <div class="wrap">
+      <h2>세 가지로 알려드려요</h2>
+      <p class="sec-lead">국토교통부 항공정보와 브이월드 공역 데이터를 기준으로 판정해요.</p>
+      <div class="verdicts">
+        <div class="v" style="background:#fff"><span class="chip" style="background:var(--red)">비행금지구역</span><p>원칙적으로 비행할 수 없는 곳이에요. 꼭 필요하면 관할기관 승인이 필요하고, 승인이 안 나는 곳도 있어요.</p></div>
+        <div class="v" style="background:#fff"><span class="chip" style="background:var(--orange)">비행승인 필요</span><p>관제권·비행제한구역 등이라 드론 원스톱에서 미리 승인을 받아야 해요.</p></div>
+        <div class="v" style="background:#fff"><span class="chip" style="background:var(--green)">비행승인 불필요</span><p>조종사 준수사항을 지키면 비행할 수 있어요. (주간, 25kg 이하 기준)</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>이런 것도 돼요</h2>
+      <p class="sec-lead">비행 전에 필요한 정보를 한곳에서 확인하세요.</p>
+      <div class="feats">
+        <div class="feat"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg><div><b>현재 날씨와 바람</b><span>바람이 세거나 비가 오면, 해가 진 뒤라면 함께 알려드려요.</span></div></div>
+        <div class="feat"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1.9.4 1.8.7 2.7a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.7.7a2 2 0 0 1 1.7 2z"/></svg><div><b>관할 담당자 연락처</b><span>지도에서 누르면 비행구역·특별비행·항공촬영 담당 기관 전화번호가 나와요.</span></div></div>
+        <div class="feat"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2z"/><path d="M9 4v14M15 6v14"/></svg><div><b>지도에서 구역 보기</b><span>비행금지·제한구역, 관제권, 국립공원, 국가유산 구역을 지도에서 켜고 끌 수 있어요.</span></div></div>
+        <div class="feat"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg><div><b>규칙·승인·노탐 안내</b><span>비행 규칙, 승인 신청 방법, 기체 신고와 조종 자격까지 메뉴 버튼으로 바로 볼 수 있어요.</span></div></div>
+      </div>
+    </div>
+  </section>
+
+  <section style="padding-top:0">
+    <div class="wrap">
+      <div class="map-band">
+        <div>
+          <h3>지도에서 직접 눌러 보세요</h3>
+          <p>원하는 곳을 누르면 구역, 주소, 담당자 연락처, 주의사항이 나와요.</p>
+        </div>
+        <a class="btn" href="/map">드로니봇 지도서비스 열기</a>
+      </div>
+    </div>
+  </section>
+
+  <section id="faq" style="background:var(--bg)">
+    <div class="wrap" style="max-width:760px">
+      <h2>자주 묻는 질문</h2>
+      <details><summary>무료인가요?</summary><p>네, 무료예요. 회원가입이나 앱 설치 없이 카카오톡 채널만 추가하면 돼요.</p></details>
+      <details><summary>드로니봇 결과만 보고 날려도 되나요?</summary><p>드로니봇의 결과는 참고용이에요. 비행승인이나 허가를 대신하지 않아요. 실제 비행 전에는 드론 원스톱과 노탐(NOTAM)을 꼭 확인해 주세요.</p></details>
+      <details><summary>개인정보를 수집하나요?</summary><p>이름, 전화번호, 위치(GPS) 같은 개인정보를 수집하지 않아요. 보내 주신 장소 이름은 판정에만 쓰고 따로 저장하지 않아요.</p></details>
+      <details><summary>어떤 데이터를 쓰나요?</summary><p>국토교통부 항공정보간행물(eAIP), 브이월드(국토교통부) 공역·지도·주소 데이터, 드론 원스톱 담당자 안내, Open-Meteo 날씨 정보를 사용해요.</p></details>
+      <details><summary>결과가 이상하면 어떻게 하나요?</summary><p>카카오톡 채널 ‘드로니봇’으로 장소 이름과 함께 알려 주세요. 확인 후 고칠게요.</p></details>
+    </div>
+  </section>
+
+  <section style="padding:40px 0 56px">
+    <div class="wrap" style="max-width:760px">
+      <div class="warn">※ 비행금지·제한구역이 아니어도 사유지, 해수욕장, 국립공원, 문화재, 군부대, 국가중요시설, 항만 등은 관리자와 미리 협의해야 해요. 야간 비행, 사람 많은 곳 위 비행, 150m 이상 비행은 따로 승인이 필요해요.</div>
+    </div>
+  </section>
 </main>
+
+<footer>
+  <div class="wrap">
+    <div><a href="/terms">이용안내</a><a href="/map">지도서비스</a><a href="https://pf.kakao.com/_xlZvxeX" target="_blank" rel="noopener">카카오톡 채널</a></div>
+    <div style="margin-top:10px">데이터: 국토교통부 항공정보간행물 · 브이월드(국토교통부) · 드론 원스톱 · Open-Meteo</div>
+    <div>© 2026 드로니봇</div>
+  </div>
+</footer>
 </body>
 </html>
