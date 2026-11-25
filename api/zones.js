@@ -1,5 +1,6 @@
 // 우리 공역 API: 전체 구역을 GeoJSON으로 돌려줌 (지도 확인용)
 // GET /api/zones
+import { guard } from '../lib/guard.js';
 import { loadAirspace } from '../lib/aip.js';
 
 const R = 6371000;
@@ -50,13 +51,13 @@ export function toGeoJSON(areas) {
 }
 
 export default async function handler(req, res) {
+  if (!guard(req, res, 'zones', 30)) return;
   try {
     const { pkg, areas } = await loadAirspace();
-    res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=21600');
     res.status(200).json({ pkg, count: areas.length, ...toGeoJSON(areas) });
   } catch (e) {
     console.error(e);
-    res.status(502).json({ error: 'eAIP를 읽지 못했어요', detail: e.message });
+    res.status(502).json({ error: '공역 정보를 읽지 못했어요' });
   }
 }
