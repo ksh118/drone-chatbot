@@ -1,5 +1,5 @@
 // 지도용 브이월드 WMS 중계 (키는 서버에서만 붙임, 브라우저에 노출 안 됨)
-// GET /api/wms?layers=lt_c_uo301&bbox=...&width=256&height=256 (Leaflet WMS 요청 그대로)
+// GET /api/wms?layers=lt_c_aisprhc,lt_c_aisresc&bbox=...&width=512&height=512 (레이어 최대 4개를 한 장으로)
 import { EXTRA_LAYERS } from '../lib/extra.js';
 import { guard } from '../lib/guard.js';
 
@@ -10,9 +10,10 @@ const ALLOWED = new Set([...EXTRA_LAYERS.map(l => l.id),
 export default async function handler(req, res) {
   if (!guard(req, res, 'wms', 900)) return;
   const q = req.query || {};
-  const layer = String(q.layers || q.LAYERS || '').toLowerCase();
+  const layers = String(q.layers || q.LAYERS || '').toLowerCase().split(',').filter(Boolean);
+  const layer = layers.join(',');
   const bbox = String(q.bbox || q.BBOX || '');
-  if (!ALLOWED.has(layer) || !/^[-\d.]+,[-\d.]+,[-\d.]+,[-\d.]+$/.test(bbox)) {
+  if (!layers.length || layers.length > 4 || !layers.every(l => ALLOWED.has(l)) || !/^[-\d.]+,[-\d.]+,[-\d.]+,[-\d.]+$/.test(bbox)) {
     return res.status(400).send('bad request');
   }
   if (!process.env.VWORLD_KEY) return res.status(503).send('no key');
