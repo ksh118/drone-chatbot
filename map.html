@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>드론봇 지도</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html,body{margin:0;height:100%;font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;color:#222}
+  #map{position:absolute;inset:0}
+  .top{position:absolute;z-index:1000;left:12px;right:12px;top:12px;background:#fff;border-radius:16px;padding:14px 16px;box-shadow:0 4px 16px rgba(0,0,0,.12)}
+  .name{font-size:17px;font-weight:700;margin:0 0 6px}
+  .chip{display:inline-block;padding:4px 10px;border-radius:999px;color:#fff;font-size:13px;font-weight:700}
+  .red{background:#e8483c}.orange{background:#f06a30}.green{background:#2eaa62}.unknown{background:#8b949e}
+  .zones{font-size:13px;color:#555;margin-top:6px;line-height:1.5}
+  .bottom{position:absolute;z-index:1000;left:12px;right:12px;bottom:14px;display:flex;flex-direction:column;gap:8px}
+  .legend{background:#fff;border-radius:12px;padding:8px 12px;font-size:12px;color:#444;box-shadow:0 2px 10px rgba(0,0,0,.1);display:flex;flex-wrap:wrap;gap:10px}
+  .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+  .btns{display:flex;gap:8px}
+  .btns a{flex:1;text-align:center;background:#fff;color:#222;text-decoration:none;font-size:14px;font-weight:600;padding:13px 0;border-radius:12px;box-shadow:0 2px 10px rgba(0,0,0,.1)}
+  .note{font-size:11px;color:#666;background:rgba(255,255,255,.9);border-radius:8px;padding:6px 10px}
+</style>
+</head>
+<body>
+<div id="map"></div>
+
+<div class="top">
+  <p class="name" id="name">위치</p>
+  <span class="chip unknown" id="chip">확인 중</span>
+  <div class="zones" id="zones"></div>
+</div>
+
+<div class="bottom">
+  <div class="legend">
+    <span><i style="background:#e8483c"></i>비행금지</span>
+    <span><i style="background:#f06a30"></i>승인 필요(제한·관제권 등)</span>
+    <span><i style="background:#2eaa62"></i>비행 가능 공역</span>
+  </div>
+  <div class="btns">
+    <a href="https://drone.onestop.go.kr/common/flightArea" target="_blank" rel="noopener">드론 원스톱 지도</a>
+    <a href="https://drone.onestop.go.kr/civilappeal/flight/register" target="_blank" rel="noopener">비행승인 신청</a>
+  </div>
+  <div class="note">참고용 지도예요. 비행 전 드론 원스톱과 노탐(NOTAM)을 꼭 확인해 주세요. · 데이터: 국토교통부 eAIP, 브이월드 · 지도 © OpenStreetMap</div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const q = new URLSearchParams(location.search);
+const lat = parseFloat(q.get('lat')), lon = parseFloat(q.get('lon'));
+const name = (q.get('name') || '선택한 위치').slice(0, 40);
+const ok = isFinite(lat) && isFinite(lon) && lat > 32 && lat < 39.5 && lon > 124 && lon < 132.5;
+const center = ok ? [lat, lon] : [36.4, 127.9];
+
+const map = L.map('map', { zoomControl: false }).setView(center, ok ? 12 : 7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(map);
+
+// 브이월드 공역 레이어 (드론 원스톱 지도와 같은 데이터)
+['lt_c_aistemp', 'lt_c_aisobls', 'lt_c_aisdronezone', 'lt_c_wgisnpgug', 'lt_c_uo301'].forEach(layer =>
+  L.tileLayer.wms('/api/wms', { layers: layer, format: 'image/png', transparent: true, opacity: 0.7, minZoom: 9 }).addTo(map));
+
+// 비행금지·제한구역, 관제권 (eAIP)
+const COLOR = { red: '#e8483c', orange: '#f06a30', green: '#2eaa62' };
+fetch('/api/zones').then(r => r.json()).then(g => {
+  L.geoJSON(g, {
+    style: f => ({ color: COLOR[f.properties.level] || '#888', weight: 1.5, fillOpacity: 0.12 }),
+    onEachFeature: (f, l) => l.bindTooltip(`${f.properties.kind} ${f.properties.id}`, { sticky: true }),
+  }).addTo(map);
+}).catch(() => {});
+
+document.getElementById('name').textContent = name;
+if (ok) {
+  L.marker(center).addTo(map).bindPopup(name).openPopup();
+  // 판정 다시 확인
+  fetch(`/api/check?lat=${lat}&lon=${lon}`).then(r => r.json()).then(j => {
+    const label = { red: '비행 불가', orange: '비행승인 필요', green: '비행 가능 구역', unknown: '확인 필요' }[j.verdict] || '확인 필요';
+    const chip = document.getElementById('chip');
+    chip.textContent = label; chip.className = 'chip ' + (j.verdict || 'unknown');
+    const zones = (j.hits || []).filter(h => h.layer && h.layer.level !== 'green')
+      .map(h => h.layer.name + (h.labels && h.labels.length ? `(${h.labels.filter(Boolean).join(', ')})` : ''));
+    document.getElementById('zones').textContent = zones.length ? '해당 구역: ' + zones.slice(0, 4).join(', ') : '해당 구역 없음';
+  }).catch(() => { document.getElementById('chip').textContent = '확인 실패'; });
+} else {
+  document.getElementById('chip').textContent = '위치 정보 없음';
+}
+</script>
+</body>
+</html>
