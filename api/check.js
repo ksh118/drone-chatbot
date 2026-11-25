@@ -3,9 +3,10 @@
 import { checkAirspace } from '../lib/aip.js';
 import { geocode } from '../lib/geocode.js';
 import { checkExtra, mergeResults } from '../lib/extra.js';
+import { guard } from '../lib/guard.js';
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  if (!guard(req, res, 'check', 30)) return;
   try {
     const { lat, lon, q } = req.query || {};
     let place = null;
@@ -23,6 +24,6 @@ export default async function handler(req, res) {
     res.status(200).json({ lat: la, lon: lo, place, ...result });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ error: '판정 중 오류', detail: e.message });
+    res.status(500).json({ error: '판정 중 오류가 났어요. 잠시 후 다시 시도해 주세요.' });
   }
 }
