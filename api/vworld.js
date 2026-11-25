@@ -1,6 +1,8 @@
 // 브이월드 중계 (키는 서버에서만 붙임)
 // 배경지도: GET /api/vworld?op=tile&type=Base&z=12&y=1585&x=3493
 // 장소 검색: GET /api/vworld?op=search&q=여의도한강공원
+import { guard } from '../lib/guard.js';
+
 const TYPES = { Base: 'png', Satellite: 'jpeg', Hybrid: 'png', gray: 'png' };
 const SITE = 'https://drone-chatbot.vercel.app';
 
@@ -26,6 +28,7 @@ async function search(q, env) {
 
 export default async function handler(req, res) {
   const q = req.query || {};
+  if (!guard(req, res, q.op === 'tile' ? 'tile' : 'search', q.op === 'tile' ? 900 : 30)) return;
   const env = process.env;
   if (!env.VWORLD_KEY) return res.status(503).send('no key');
   try {
@@ -50,6 +53,6 @@ export default async function handler(req, res) {
     res.status(400).send('bad op');
   } catch (e) {
     console.error('vworld 오류', e.message);
-    res.status(504).json({ error: e.message });
+    res.status(504).json({ error: '지도 서버 응답이 늦어요. 잠시 후 다시 시도해 주세요.' });
   }
 }
