@@ -123,14 +123,14 @@ const map = L.map('map', { zoomControl: false, minZoom: 6, maxZoom: 19, maxBound
 map.attributionControl.setPrefix(false);
 
 // 브이월드 배경지도 (일반 / 위성)
-const tile = type => L.tileLayer(`/api/vworld?op=tile&type=${type}&z={z}&y={y}&x={x}`, { minZoom: 6, maxZoom: 19, attribution: '© 브이월드(국토교통부)' });
+const tile = type => L.tileLayer(`/api/vworld?op=tile&type=${type}&z={z}&y={y}&x={x}`, { minZoom: 6, maxZoom: 19, keepBuffer: 1, updateWhenIdle: true, attribution: '© 브이월드(국토교통부)' });
 const base = tile('Base').addTo(map);
 const sat = L.layerGroup([tile('Satellite'), tile('Hybrid')]);
 $('bBase').onclick = () => {
   const on = map.hasLayer(sat);
   if (on) { map.removeLayer(sat); base.addTo(map); $('bBase').classList.remove('on'); }
   else { map.removeLayer(base); sat.addTo(map); $('bBase').classList.add('on'); }
-  Object.values(groups).forEach(g => g.on && g.layers.forEach(l => l.bringToFront()));
+  overlays.forEach(l => l.bringToFront());
 };
 
 // 브이월드 공역 레이어 (드론 원스톱 지도와 같은 레이어)
@@ -144,16 +144,31 @@ const GROUPS = [
   { id: 'heri', name: '국가유산 보호구역', color: '#a0522d', on: false, layers: ['lt_c_uo301'], minZoom: 11 },
   { id: 'port', name: '항만', color: '#0e7490', on: false, layers: ['lt_c_aisport'], minZoom: 9 },
 ];
-const groups = {};
+// 휴대폰 메모리를 아끼려고 레이어를 최대 4개씩 한 장으로 묶고, 큰 타일(512px)로 적게 요청
+let overlays = [], overlayKey = '';
+function refreshOverlays() {
+  const z = map.getZoom();
+  const ids = GROUPS.filter(g => g.on && z >= g.minZoom).flatMap(g => g.layers);
+  const key = ids.join(',');
+  if (key === overlayKey) return;
+  overlayKey = key;
+  overlays.forEach(l => map.removeLayer(l));
+  overlays = [];
+  for (let i = 0; i < ids.length; i += 4) {
+    overlays.push(L.tileLayer.wms('/api/wms', {
+      layers: ids.slice(i, i + 4).join(','), format: 'image/png', transparent: true, opacity: 0.75,
+      tileSize: 512, updateWhenIdle: true, updateWhenZooming: false, keepBuffer: 1, maxZoom: 19,
+    }).addTo(map));
+  }
+}
 GROUPS.forEach(g => {
-  g.layers = g.layers.map(id => L.tileLayer.wms('/api/wms', { layers: id, format: 'image/png', transparent: true, opacity: 0.75, minZoom: g.minZoom, maxZoom: 19 }));
-  if (g.on) g.layers.forEach(l => l.addTo(map));
-  groups[g.id] = g;
   const lab = document.createElement('label');
   lab.innerHTML = `<input type="checkbox" ${g.on ? 'checked' : ''}><i style="background:${g.color}"></i>${esc(g.name)}`;
-  lab.querySelector('input').onchange = e => { g.on = e.target.checked; g.layers.forEach(l => g.on ? l.addTo(map) : map.removeLayer(l)); };
+  lab.querySelector('input').onchange = e => { g.on = e.target.checked; refreshOverlays(); };
   $('layers').appendChild(lab);
 });
+map.on('zoomend', refreshOverlays);
+refreshOverlays();
 $('bLayers').onclick = () => { const el = $('layers'); const show = el.style.display !== 'block'; el.style.display = show ? 'block' : 'none'; $('bLayers').classList.toggle('on', show); };
 
 // 공유 (현재 선택한 위치 링크)
